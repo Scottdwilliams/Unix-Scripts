@@ -1,0 +1,143 @@
+#!/bin/bash
+umask 077
+
+if [[ -z "$1" ]]; then
+	echo -e "Usage: stats {-rows|-cols} [file]"
+	exit
+fi
+
+if [[ "$1" != -c* && "$1" != -r* ]]; then
+	echo -e "Usage: stats {-rows|-cols} [file]"
+	exit
+fi
+
+if [[ -z "$2" ]]; then
+	echo -e "Usage: stats {-rows|-cols} [file]"
+	exit
+fi
+
+file="$2"
+
+if [[ "$1" == -r* ]]	#if rows, perform normal functions
+then
+
+	echo -e "Avg \tMedian"
+	while IFS= read -r line
+	do
+		sum=0		#set the current sum to 0
+		icount=0	#set a count for the number of elements
+		
+		array=($line)		#initialize the array to the current line of numbers
+		array=($(for j in "${array[@]}"; do echo "$j"; done | sort -n))	#sorts the current array numerically		
+	
+		#loop that increases the counter and adds the current element to the running sum
+		for i in "${array[@]}"
+		do
+			icount=`expr $icount + 1`
+			sum=`expr $sum + $i`
+		done	
+	
+		avg=`expr $sum / $icount`	#calculates the average of the current row
+		num_count=`expr $icount % 2`	#determines if the number of elements is odd or even to calc median
+		
+		if [ $num_count == 1 ]; then	#if mod is 1, total count is odd so the median is the middle element
+			median=`expr $icount / 2`
+			new_med=`expr "${array[$median]}"`
+		else				#if mod is 0, total count is even and median is avg of the middle two elements
+			median=`expr $icount / 2`
+			new_med=`expr "${array[$median]}" + "${array[$median - 1]}"`
+			new_med=`expr $new_med / 2`
+		fi
+		
+		echo -e "$avg \t$new_med"
+
+	done < "$file" 
+
+fi
+
+if [[ "$1" == -c* ]]	#if cols, translate rows to cols and then perform normal functions
+then
+
+	colcount=1					#keeps track of the column number to cut
+	num_of_lines=$(wc -l < $file)				#save the number of lines
+	num_of_words=$(wc -w < $file)				#save the number of words
+	num_of_cols=`expr $num_of_words / $num_of_lines`	#divide words by lines to see number of columns
+	
+	echo "Averages:"
+	while [[ $colcount -le $num_of_cols ]]
+	do
+		
+		awk -v var="$colcount" '{ print $var }' $file >> tempCol	#cut each column and put into the tempCol file.
+		colcount=`expr $colcount + 1`		#increase the column counter
+		cat tempCol | tr '\n' '\t' > tempRow	#translate the tempCol file into a row in the new tempRow file
+		echo -e "" >> tempRow			#add a newline char to be able to read the line	
+		
+
+		sum=0		
+		icount=0
+
+		#loops through each number in the current line(column) and increases the sum and column count
+		while read line
+		do
+		
+			array=($line)
+			for i in "${array[@]}"
+			do
+				sum=`expr $sum + $i`
+				icount=`expr $icount + 1`
+				avg=`expr $sum / $icount`
+			done
+		echo -ne "$avg\t"
+		done < tempRow
+		
+		#delete temp files
+		rm -f tempRow
+		rm -f tempCol
+	done < "$file"
+	echo -e "\n"
+
+	colcount=1					#reset the current column number
+	
+	echo "Medians:"
+	while [[ $colcount -le $num_of_cols ]]
+	do
+
+		awk -v var="$colcount" '{ print $var }' $file >> tempCol	#cut each column and put into the tempCol file.
+		colcount=`expr $colcount + 1`		#increase the column counter
+		cat tempCol | tr '\n' '\t' > tempRow	#translate the tempCol file into a row in the tempRow file
+		echo -e "" >> tempRow			#add a newline char to be able to read the line
+
+		#loops through each number in the current line(column) and increases the column count
+		while read line
+		do
+
+			icount=0
+			array=($line)
+			array=($(for j in "${array[@]}"; do echo "$j"; done | sort -n))		#sort array numberically
+
+			for i in "${array[@]}"
+			do
+				icount=`expr $icount + 1`
+			done
+			
+			num_count=`expr $icount % 2`		#determines if the number of elements is odd or even to calc median
+			if [[ $num_cout == 1 ]]; then		#if mod is 1, total count is odd so the median is the middle element
+				median=`expr $icount / 2`
+				new_med=`expr "${array[$median]}"`
+
+			else					#if mod is 0, total count is even and median is avg of middle elements
+				median=`expr $icount / 2`
+				new_med=`expr "${array[$median]}" + "${array[$median - 1]}"`
+				new_med=`expr $new_med / 2`
+			fi
+		done < tempRow
+		echo -ne "$new_med\t"
+
+		#delete temp files
+		rm -f tempCol
+		rm -f tempRow
+
+	done < "$file"
+	echo -e "\n"
+
+fi

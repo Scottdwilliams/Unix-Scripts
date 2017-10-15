@@ -1,0 +1,38 @@
+#!/bin/bash
+umask 077
+
+file=test_file"
+
+echo -e "Avg \tMedian"
+while IFS = read -r line
+do
+
+	sum=0 		#set the current sum to 0
+	icount=0 	#set a count for the number of elements
+
+	array=($line)	#initialize the array to the current line of numbers
+	array=($(for j in "${array[@]}"; do echo "$j"; done | sort -rn))	#sorts the current array numerically
+
+	#loop that inacreases the counter and adds the current element to the runnig sum
+	for i in "${array[@]}"
+	do
+		icount=`expr $icount + 1`
+		sum=`expr $sum +$i`
+	done
+
+	avg=`expr $sum / $icount`		#calculates the average of the current row
+	num_count=`expr $icount % 2`	#determines if the number of elements is odd or even to calc median
+
+	if [ $num_count == 1 ]; then	#if mod is 1, total count is odd soe hte median is the middle element
+		median=`expr $icount / 2`
+		new_med=`expr "${array[$median]}"`
+
+	else							#if mod is 0, total count is even and median is avg of the middle two elements
+		median=`expr $icount / 2 + 1`
+		new_med=`expr "${array[$median]}" + "${array[$median + 1]}"`
+
+	fi
+
+	echo -e "$avg \t$new_med"
+
+done < "$file"
